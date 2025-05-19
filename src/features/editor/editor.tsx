@@ -82,6 +82,7 @@ const Editor = () => {
 
   return (
     <div className="flex h-screen w-screen flex-col">
+      {/* top nav bar */}
       <Navbar
         projectName={projectName}
         user={null}
@@ -94,7 +95,9 @@ const Editor = () => {
             <FloatingControl />
             <div className="flex h-full flex-1">
               <div className="bg-sidebar flex flex-none border-r border-border/80">
+                {/* left side bar */}
                 <MenuList />
+                {/* left side bar extension */}
                 <MenuItem />
               </div>
               <div
@@ -107,6 +110,8 @@ const Editor = () => {
                 }}
               >
                 <CropModal />
+
+                {/* media container */}
                 <Scene stateManager={stateManager} />
               </div>
             </div>
@@ -121,6 +126,7 @@ const Editor = () => {
             {playerRef && <Timeline stateManager={stateManager} />}
           </ResizablePanel>
         </ResizablePanelGroup>
+        {/* right side bar */}
         <ControlItem />
       </div>
     </div>

@@ -14,6 +14,7 @@ import Blur from "./common/blur";
 import Brightness from "./common/brightness";
 import useLayoutStore from "../store/use-layout-store";
 import { Label } from "@/components/ui/label";
+import MediaProperties from "./common/media-properties";
 
 const BasicImage = ({ trackItem }: { trackItem: ITrackItem & IImage }) => {
   const [properties, setProperties] = useState(trackItem);
@@ -176,6 +177,7 @@ const BasicImage = ({ trackItem }: { trackItem: ITrackItem & IImage }) => {
       </div>
       <ScrollArea className="h-full">
         <div className="flex flex-col gap-2 px-4">
+          <MediaProperties trackItem={trackItem} />
           <div className="mb-4 mt-2">
             <Button
               variant={"secondary"}

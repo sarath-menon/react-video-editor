@@ -14,6 +14,7 @@ import { EDIT_OBJECT } from "@designcombo/state";
 import Speed from "./common/speed";
 import useLayoutStore from "../store/use-layout-store";
 import { Label } from "@/components/ui/label";
+import MediaProperties from "./common/media-properties";
 
 const BasicVideo = ({ trackItem }: { trackItem: ITrackItem & IVideo }) => {
   const [properties, setProperties] = useState(trackItem);
@@ -173,6 +174,7 @@ const BasicVideo = ({ trackItem }: { trackItem: ITrackItem & IVideo }) => {
       </div>
       <ScrollArea className="h-full">
         <div className="flex flex-col gap-2 px-4">
+          <MediaProperties trackItem={trackItem} />
           <div className="mb-4 mt-2">
             <Button
               variant={"secondary"}

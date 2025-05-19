@@ -9,7 +9,6 @@ import { getCurrentTime } from "../utils/time";
 
 interface SceneInteractionsProps {
   stateManager: StateManager;
-  containerRef: React.RefObject<HTMLDivElement>;
   boardContainerRef: React.RefObject<HTMLDivElement>;
   zoom: number;
   size: { width: number; height: number };

@@ -14,21 +14,21 @@ import useStore from "../store/use-store";
 import StateManager from "@designcombo/state";
 import { getCurrentTime } from "../utils/time";
 
-let holdGroupPosition: Record<string, any> | null = null;
+let holdGroupPosition: Record<string, { x: number; y: number }> | null = null;
 let dragStartEnd = false;
 
 interface SceneInteractionsProps {
   stateManager: StateManager;
-  viewerRef: React.RefObject<any>;
   containerRef: React.RefObject<HTMLDivElement>;
+  boardContainerRef: React.RefObject<HTMLDivElement>;
   zoom: number;
   size: { width: number; height: number };
 }
 export function SceneInteractions({
   stateManager,
-  viewerRef,
+  boardContainerRef,
   zoom,
-}: SceneInteractionsProps) {
+}: Omit<SceneInteractionsProps, "containerRef">) {
   const [targets, setTargets] = useState<HTMLDivElement[]>([]);
   const [selection, setSelection] = useState<Selection>();
   const {
@@ -66,7 +66,7 @@ export function SceneInteractions({
       updateTargets();
     });
 
-    const onSeeked = (v: any) => {
+    const onSeeked = (v: { detail: { frame: number } }) => {
       setTimeout(() => {
         const { fps } = useStore.getState();
         const seekedTime = (v.detail.frame / fps) * 1000;
@@ -83,7 +83,7 @@ export function SceneInteractions({
 
   useEffect(() => {
     const selection = new Selection({
-      container: viewerRef.current?.infiniteViewer.getContainer(),
+      container: boardContainerRef.current,
       boundContainer: true,
       hitRate: 0,
       selectableTargets: [".designcombo-scene-item"],
@@ -292,8 +292,8 @@ export function SceneInteractions({
           event.target.style.left = `${left}px`;
           event.target.style.top = `${top}px`;
           holdGroupPosition[id] = {
-            left: left,
-            top: top,
+            x: left,
+            y: top,
           };
         }
       }}
@@ -369,10 +369,13 @@ export function SceneInteractions({
       }}
       onDragGroupEnd={() => {
         if (holdGroupPosition) {
-          const payload: Record<string, Partial<any>> = {};
+          const payload: Record<
+            string,
+            { details: { left: string; top: string } }
+          > = {};
           Object.keys(holdGroupPosition).forEach((id) => {
-            const left = holdGroupPosition![id].left;
-            const top = holdGroupPosition![id].top;
+            const left = holdGroupPosition![id].x;
+            const top = holdGroupPosition![id].y;
             payload[id] = {
               details: {
                 top: `${top}px`,

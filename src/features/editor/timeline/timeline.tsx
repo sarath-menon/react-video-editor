@@ -4,7 +4,7 @@ import Ruler from "./ruler";
 import { timeMsToUnits, unitsToTimeMs } from "@designcombo/timeline";
 import CanvasTimeline from "./items/timeline";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import { dispatch, filter, subject } from "@designcombo/events";
+import { filter, subject } from "@designcombo/events";
 import {
   TIMELINE_BOUNDING_CHANGED,
   TIMELINE_PREFIX,
@@ -13,12 +13,11 @@ import useStore from "../store/use-store";
 import Playhead from "./playhead";
 import { useCurrentPlayerFrame } from "../hooks/use-current-frame";
 import { Audio, Image, Text, Video, Caption, Helper, Track } from "./items";
-import StateManager, { REPLACE_MEDIA } from "@designcombo/state";
+import StateManager from "@designcombo/state";
 import {
   TIMELINE_OFFSET_CANVAS_LEFT,
   TIMELINE_OFFSET_CANVAS_RIGHT,
 } from "../constants/constants";
-import { ITrackItem } from "@designcombo/types";
 import PreviewTrackItem from "./items/preview-drag-item";
 
 CanvasTimeline.registerItems({
@@ -67,29 +66,44 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
 
   useEffect(() => {
     const position = timeMsToUnits((currentFrame / fps) * 1000, scale.zoom);
-    const canvasBoudingX =
-      canvasElRef.current?.getBoundingClientRect().x! +
-      canvasElRef.current?.clientWidth!;
+    const canvasBoundingRect = canvasElRef.current?.getBoundingClientRect();
+    const canvasClientWidth = canvasElRef.current?.clientWidth;
+
+    // Only proceed if we have valid values
+    if (!canvasBoundingRect || !canvasClientWidth) return;
+
+    const canvasBoudingX = canvasBoundingRect.x + canvasClientWidth;
     const playHeadPos = position - scrollLeft + 40;
+
     if (playHeadPos >= canvasBoudingX) {
-      const scrollDivWidth = horizontalScrollbarVpRef.current?.clientWidth!;
-      const totalScrollWidth = horizontalScrollbarVpRef.current?.scrollWidth!;
-      const currentPosScroll = horizontalScrollbarVpRef.current?.scrollLeft!;
+      const scrollDivWidth = horizontalScrollbarVpRef.current?.clientWidth;
+      const totalScrollWidth = horizontalScrollbarVpRef.current?.scrollWidth;
+      const currentPosScroll = horizontalScrollbarVpRef.current?.scrollLeft;
+
+      // Only proceed if we have valid values
+      if (
+        !scrollDivWidth ||
+        !totalScrollWidth ||
+        currentPosScroll === undefined
+      )
+        return;
+
       const availableScroll =
         totalScrollWidth - (scrollDivWidth + currentPosScroll);
       const scaleScroll = availableScroll / scrollDivWidth;
       if (scaleScroll >= 0) {
-        if (scaleScroll > 1)
-          horizontalScrollbarVpRef.current?.scrollTo({
+        if (scaleScroll > 1 && horizontalScrollbarVpRef.current) {
+          horizontalScrollbarVpRef.current.scrollTo({
             left: currentPosScroll + scrollDivWidth,
           });
-        else
-          horizontalScrollbarVpRef.current?.scrollTo({
+        } else if (horizontalScrollbarVpRef.current) {
+          horizontalScrollbarVpRef.current.scrollTo({
             left: totalScrollWidth - scrollDivWidth,
           });
+        }
       }
     }
-  }, [currentFrame]);
+  }, [currentFrame, fps, scale.zoom, scrollLeft]);
 
   const onResizeCanvas = (payload: { width: number; height: number }) => {
     setCanvasSize({
@@ -164,8 +178,19 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
     });
 
     const tracksSubscription = stateManager.subscribeToState((newState) => {
-      setState(newState);
+      // Type-safe way to only pass the properties that the store can handle
+      setState({
+        tracks: newState.tracks,
+        trackItemIds: newState.trackItemIds,
+        trackItemsMap: newState.trackItemsMap,
+        // Cast the trackItemDetailsMap to match the expected type
+        trackItemDetailsMap: newState.trackItemDetailsMap as unknown as Record<
+          string,
+          Record<string, unknown>
+        >,
+      });
     });
+
     const durationSubscription = stateManager.subscribeToDuration(
       (newState) => {
         setState(newState);
@@ -184,7 +209,12 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
       () => {
         const currentState = stateManager.getState();
         setState({
-          trackItemDetailsMap: currentState.trackItemDetailsMap,
+          // Cast the trackItemDetailsMap to match the expected type
+          trackItemDetailsMap:
+            currentState.trackItemDetailsMap as unknown as Record<
+              string,
+              Record<string, unknown>
+            >,
           trackItemsMap: currentState.trackItemsMap,
           trackItemIds: currentState.trackItemIds,
           tracks: currentState.tracks,
@@ -196,7 +226,12 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
       stateManager.subscribeToUpdateItemDetails(() => {
         const currentState = stateManager.getState();
         setState({
-          trackItemDetailsMap: currentState.trackItemDetailsMap,
+          // Cast the trackItemDetailsMap to match the expected type
+          trackItemDetailsMap:
+            currentState.trackItemDetailsMap as unknown as Record<
+              string,
+              Record<string, unknown>
+            >,
         });
       });
 
@@ -210,7 +245,7 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
       updateItemDetailsSubscription.unsubscribe();
       resizeDesignSubscription.unsubscribe();
     };
-  }, []);
+  }, [duration, scale, setState, stateManager, setTimeline]);
 
   const handleOnScrollH = (e: React.UIEvent<HTMLDivElement, UIEvent>) => {
     const scrollLeft = e.currentTarget.scrollLeft;
@@ -250,18 +285,6 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
     };
   }, []);
 
-  const handleReplaceItem = (trackItem: Partial<ITrackItem>) => {
-    dispatch(REPLACE_MEDIA, {
-      payload: {
-        [trackItem.id!]: {
-          details: {
-            src: "https://cdn.designcombo.dev/videos/demo-video-4.mp4",
-          },
-        },
-      },
-    });
-  };
-
   const onClickRuler = (units: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -277,13 +300,13 @@ const Timeline = ({ stateManager }: { stateManager: StateManager }) => {
     if (availableScroll < canvasWidth + scrollLeft) {
       timeline.scrollTo({ scrollLeft: availableScroll - canvasWidth });
     }
-  }, [scale]);
+  }, [scale, scrollLeft, timeline]);
 
   return (
     <div
       ref={timelineContainerRef}
       id={"timeline-container"}
-      className="relative h-full w-full overflow-hidden bg-sidebar"
+      className="bg-sidebar relative h-full w-full overflow-hidden"
     >
       <Header />
       <Ruler onClick={onClickRuler} scrollLeft={scrollLeft} />

@@ -23,6 +23,7 @@ export function SceneInteractions({
   const [targets, setTargets] = useState<HTMLDivElement[]>([]);
   const selectionBoxRef = useRef<HTMLDivElement>(null);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [selectionBox, setSelectionBox] = useState({
     x: 0,
@@ -56,12 +57,11 @@ export function SceneInteractions({
     });
 
     const onSeeked = (v: { detail: { frame: number } }) => {
-      setTimeout(() => {
-        const { fps } = useStore.getState();
-        const seekedTime = (v.detail.frame / fps) * 1000;
-        updateTargets(seekedTime);
-      });
+      const { fps } = useStore.getState();
+      const seekedTime = (v.detail.frame / fps) * 1000;
+      updateTargets(seekedTime);
     };
+
     playerRef?.current?.addEventListener("seeked", onSeeked);
 
     return () => {
@@ -76,7 +76,7 @@ export function SceneInteractions({
     if (!container) return;
 
     // Handle selection box
-    const handleMouseDown = (e: MouseEvent) => {
+    const handlePointerDown = (e: PointerEvent) => {
       // Check if clicking on a scene item or its child elements
       const target = e.target as HTMLElement;
       const closestSceneItem = target.closest(".designcombo-scene-item");
@@ -101,21 +101,24 @@ export function SceneInteractions({
       }
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       if (!isSelecting) return;
 
-      const currentX = e.clientX;
-      const currentY = e.clientY;
+      // Use requestAnimationFrame for smoother selection box updates
+      requestAnimationFrame(() => {
+        const currentX = e.clientX;
+        const currentY = e.clientY;
 
-      setSelectionBox({
-        x: Math.min(startPos.x, currentX),
-        y: Math.min(startPos.y, currentY),
-        width: Math.abs(currentX - startPos.x),
-        height: Math.abs(currentY - startPos.y),
+        setSelectionBox({
+          x: Math.min(startPos.x, currentX),
+          y: Math.min(startPos.y, currentY),
+          width: Math.abs(currentX - startPos.x),
+          height: Math.abs(currentY - startPos.y),
+        });
       });
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       if (!isSelecting) return;
       setIsSelecting(false);
 
@@ -129,7 +132,8 @@ export function SceneInteractions({
         };
 
         const selectedElements: HTMLDivElement[] = [];
-        const items = document.querySelectorAll(".designcombo-scene-item");
+        // Use a more efficient selector
+        const items = container.querySelectorAll(".designcombo-scene-item");
 
         items.forEach((item) => {
           const rect = item.getBoundingClientRect();
@@ -162,14 +166,19 @@ export function SceneInteractions({
       }
     };
 
-    container.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
+    // Use pointer events instead of mouse events for better multi-device support
+    container.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("pointermove", handlePointerMove, {
+      passive: true,
+    });
+    document.addEventListener("pointerup", handlePointerUp);
+    document.addEventListener("pointercancel", handlePointerUp);
 
     return () => {
-      container.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
+      container.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerUp);
+      document.removeEventListener("pointercancel", handlePointerUp);
     };
   }, [boardContainerRef, isSelecting, startPos, selectionBox, stateManager]);
 
@@ -186,78 +195,136 @@ export function SceneInteractions({
     };
   }, [stateManager, setState]);
 
-  // Handle dragging selected elements
+  // Handle dragging selected elements with improved performance
   useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
+    if (!targets.length) return;
+
+    // Add draggable cursor class to selected elements
+    targets.forEach((target) => {
+      target.classList.add("designcombo-draggable");
+    });
+
+    // Prepare initial element positions and transforms
+    const elementsData = new Map<
+      HTMLDivElement,
+      {
+        id: string;
+        initialLeft: number;
+        initialTop: number;
+        transform: { x: number; y: number };
+      }
+    >();
+
+    targets.forEach((target) => {
+      const id = getIdFromClassName(target.className);
+      const initialLeft = parseFloat(target.style.left) || 0;
+      const initialTop = parseFloat(target.style.top) || 0;
+
+      elementsData.set(target, {
+        id,
+        initialLeft,
+        initialTop,
+        transform: { x: 0, y: 0 },
+      });
+    });
+
+    let localIsDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    const handlePointerDown = (e: PointerEvent) => {
       const target = e.target as HTMLElement;
       const sceneItem = target.closest(".designcombo-scene-item");
 
-      if (!sceneItem || targets.length === 0) return;
+      if (!sceneItem || !elementsData.has(sceneItem as HTMLDivElement)) return;
 
-      // Check if the clicked item is part of the selection
-      if (!targets.includes(sceneItem as HTMLDivElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
 
-      const initialPositions = targets.map((item) => {
-        const rect = item.getBoundingClientRect();
-        return {
-          element: item,
-          initialX: rect.left,
-          initialY: rect.top,
-          currentX: e.clientX,
-          currentY: e.clientY,
+      // Set pointer capture for reliable tracking even if pointer leaves the window
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+      localIsDragging = true;
+      setIsDragging(true);
+      startX = e.clientX;
+      startY = e.clientY;
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!localIsDragging) return;
+
+      // Calculate movement delta
+      const dx = (e.clientX - startX) / zoom;
+      const dy = (e.clientY - startY) / zoom;
+
+      // Use requestAnimationFrame for smooth animation
+      requestAnimationFrame(() => {
+        elementsData.forEach((data, element) => {
+          // Use transform for better performance
+          element.style.transform = `translate(${dx}px, ${dy}px)`;
+          data.transform = { x: dx, y: dy };
+        });
+      });
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      if (!localIsDragging) return;
+
+      // Release pointer capture
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+
+      localIsDragging = false;
+      setIsDragging(false);
+
+      // Commit changes to the actual top/left styles and reset transforms
+      const payload: Record<
+        string,
+        { details: { left: string; top: string } }
+      > = {};
+
+      elementsData.forEach((data, element) => {
+        const newLeft = data.initialLeft + data.transform.x;
+        const newTop = data.initialTop + data.transform.y;
+
+        // Update the element's position
+        element.style.left = `${newLeft}px`;
+        element.style.top = `${newTop}px`;
+        element.style.transform = "";
+
+        // Prepare payload for state update
+        payload[data.id] = {
+          details: {
+            left: `${newLeft}px`,
+            top: `${newTop}px`,
+          },
         };
       });
 
-      const handleDragMove = (moveEvent: MouseEvent) => {
-        const dx = moveEvent.clientX - e.clientX;
-        const dy = moveEvent.clientY - e.clientY;
-
-        initialPositions.forEach((item) => {
-          const left = item.initialX + dx;
-          const top = item.initialY + dy;
-          item.element.style.left = `${left}px`;
-          item.element.style.top = `${top}px`;
-        });
-      };
-
-      const handleDragEnd = () => {
-        // Update positions in store
-        const payload: Record<
-          string,
-          { details: { left: string; top: string } }
-        > = {};
-
-        initialPositions.forEach((item) => {
-          const id = getIdFromClassName(item.element.className);
-          payload[id] = {
-            details: {
-              left: item.element.style.left,
-              top: item.element.style.top,
-            },
-          };
-        });
-
-        dispatch(EDIT_OBJECT, { payload });
-
-        document.removeEventListener("mousemove", handleDragMove);
-        document.removeEventListener("mouseup", handleDragEnd);
-      };
-
-      document.addEventListener("mousemove", handleDragMove);
-      document.addEventListener("mouseup", handleDragEnd);
+      // Dispatch changes to store
+      dispatch(EDIT_OBJECT, { payload });
     };
 
     // Attach event listeners for dragging
     targets.forEach((target) => {
-      target.addEventListener("mousedown", handleMouseDown);
+      target.addEventListener("pointerdown", handlePointerDown);
     });
+    document.addEventListener("pointermove", handlePointerMove, {
+      passive: true,
+    });
+    document.addEventListener("pointerup", handlePointerUp);
+    document.addEventListener("pointercancel", handlePointerUp);
 
     return () => {
+      // Remove draggable cursor class when targets change or component unmounts
       targets.forEach((target) => {
-        target.removeEventListener("mousedown", handleMouseDown);
+        target.classList.remove("designcombo-draggable");
+        target.removeEventListener("pointerdown", handlePointerDown);
       });
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerUp);
+      document.removeEventListener("pointercancel", handlePointerUp);
     };
-  }, [targets]);
+  }, [targets, zoom]);
 
   return (
     <>
@@ -277,25 +344,29 @@ export function SceneInteractions({
           }}
         />
       )}
-      {targets.map((target, index) => (
-        <div
-          key={index}
-          className="resize-handle-container"
-          style={{
-            position: "absolute",
-            left: target.style.left,
-            top: target.style.top,
-            width: target.offsetWidth + "px",
-            height: target.offsetHeight + "px",
-            border: "1px solid #00a0ff",
-            pointerEvents: "none",
-            zIndex: 999,
-            transform: `scale(${1 / zoom})`,
-          }}
-        >
-          {/* Resize handles would go here */}
-        </div>
-      ))}
+
+      {/* Selection boxes around selected elements */}
+      {!isDragging &&
+        targets.map((target, index) => {
+          return (
+            <div
+              key={`selection-${index}`}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                width: target.offsetWidth + "px",
+                height: target.offsetHeight + "px",
+                transform: `translate(${target.style.left}, ${target.style.top})`,
+                border: "2px solid #00a0ff",
+                borderRadius: "2px",
+                pointerEvents: "none",
+                zIndex: 999,
+                boxSizing: "border-box",
+              }}
+            />
+          );
+        })}
     </>
   );
 }

@@ -4,11 +4,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import useDataState from "../../store/use-data-state";
 import { dispatch } from "@designcombo/events";
 import { EDIT_OBJECT } from "@designcombo/state";
-import { ChevronDown, Search, Strikethrough, Underline, X } from "lucide-react";
+import { ChevronDown, Strikethrough, Underline, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import Opacity from "./opacity";
 import { Input } from "@/components/ui/input";
@@ -16,9 +14,12 @@ import { ITrackItem } from "@designcombo/types";
 import { Label } from "@/components/ui/label";
 import ColorPicker from "@/components/color-picker";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ICompactFont, IFont } from "../../interfaces/editor";
-import useLayoutStore from "../../store/use-layout-store";
-import { DndDraggable, DndProvider } from "../../components/DndDraggable";
+import { ICompactFont, IFont } from "@/features/editor/interfaces/editor";
+import useLayoutStore from "@/features/editor/store/use-layout-store";
+import {
+  DndDraggable,
+  DndProvider,
+} from "@/features/editor/components/DndDraggable";
 
 interface TextControlsProps {
   trackItem: ITrackItem & any;

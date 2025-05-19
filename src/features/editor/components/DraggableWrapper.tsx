@@ -4,7 +4,6 @@ import {
   useSensor,
   useSensors,
   PointerSensor,
-  DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { useDraggable } from "@dnd-kit/core";
@@ -34,13 +33,6 @@ function DraggableContent({
       }
     : undefined;
 
-  // Create a wrapper to handle drag events
-  const wrapper = (
-    <div ref={setNodeRef} style={style} {...attributes}>
-      {children}
-    </div>
-  );
-
   // If there's a handle specified, find it and apply the listeners
   if (handleClassName) {
     const findAndAttachToHandle = (
@@ -49,27 +41,34 @@ function DraggableContent({
       return React.Children.map(children, (child) => {
         if (!React.isValidElement(child)) return child;
 
+        // TypeScript specific type assertion for props
+        type ElementProps = {
+          className?: string;
+          children?: React.ReactNode;
+          [key: string]: unknown;
+        };
+
+        const typedChild = child as React.ReactElement<ElementProps>;
+        const props = typedChild.props;
+
         // If this is the handle, attach listeners
-        if (
-          child.props.className &&
-          child.props.className.includes(handleClassName)
-        ) {
-          return React.cloneElement(child, {
-            ...child.props,
+        if (props.className && props.className.includes(handleClassName)) {
+          return React.cloneElement(typedChild, {
+            ...props,
             ...listeners,
           });
         }
 
         // If it has children, recursively search
-        if (child.props.children) {
-          const newChildren = findAndAttachToHandle(child.props.children);
-          return React.cloneElement(child, {
-            ...child.props,
+        if (props.children) {
+          const newChildren = findAndAttachToHandle(props.children);
+          return React.cloneElement(typedChild, {
+            ...props,
             children: newChildren,
           });
         }
 
-        return child;
+        return typedChild;
       });
     };
 

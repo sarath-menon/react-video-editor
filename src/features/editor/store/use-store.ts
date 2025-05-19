@@ -7,9 +7,16 @@ import {
   ITrackItem,
   ITransition,
 } from "@designcombo/types";
-import Moveable from "@interactify/moveable";
 import { PlayerRef } from "@remotion/player";
 import { create } from "zustand";
+
+// Define a custom interface to replace Moveable dependency
+interface MoveableRef {
+  moveable: {
+    updateRect: () => void;
+    forceUpdate: () => void;
+  };
+}
 
 interface ITimelineStore {
   duration: number;
@@ -22,7 +29,7 @@ interface ITimelineStore {
   transitionIds: string[];
   transitionsMap: Record<string, ITransition>;
   trackItemsMap: Record<string, ITrackItem>;
-  trackItemDetailsMap: Record<string, any>;
+  trackItemDetailsMap: Record<string, Record<string, unknown>>;
   activeIds: string[];
   timeline: Timeline | null;
   setTimeline: (timeline: Timeline) => void;
@@ -31,9 +38,9 @@ interface ITimelineStore {
   playerRef: React.RefObject<PlayerRef> | null;
   setPlayerRef: (playerRef: React.RefObject<PlayerRef> | null) => void;
 
-  sceneMoveableRef: React.RefObject<Moveable> | null;
-  setSceneMoveableRef: (ref: React.RefObject<Moveable>) => void;
-  setState: (state: any) => Promise<void>;
+  sceneMoveableRef: React.RefObject<MoveableRef> | null;
+  setSceneMoveableRef: (ref: React.RefObject<MoveableRef>) => void;
+  setState: (state: Partial<ITimelineStore>) => Promise<void>;
 }
 
 const useStore = create<ITimelineStore>((set) => ({

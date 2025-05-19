@@ -5,7 +5,7 @@ import { RotateCw } from "lucide-react";
 import { useState } from "react";
 
 const Transform = () => {
-  const [_, setValue] = useState([10]);
+  const [scale, setScale] = useState([10]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -23,7 +23,8 @@ const Transform = () => {
             id="opacity"
             max={1}
             step={0.1}
-            onValueChange={setValue}
+            value={scale}
+            onValueChange={setScale}
             aria-label="Temperature"
           />
           <Input className="w-11 px-2 text-center text-sm" defaultValue={100} />

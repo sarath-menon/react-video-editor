@@ -1,6 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { useState, useEffect } from "react";
+import { useThrottledCallback } from "@tanstack/react-pacer";
+import { THROTTLE_WAIT_MS } from "./constants";
 
 const Opacity = ({
   value,
@@ -9,13 +10,9 @@ const Opacity = ({
   value: number;
   onChange: (v: number) => void;
 }) => {
-  // Create local state to manage opacity
-  const [localValue, setLocalValue] = useState(value);
-
-  // Update local state when prop value changes
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
+  const throttledOnChange = useThrottledCallback(onChange, {
+    wait: THROTTLE_WAIT_MS,
+  });
 
   return (
     <div className="flex gap-2">
@@ -37,20 +34,16 @@ const Opacity = ({
           onChange={(e) => {
             const newValue = Number(e.target.value);
             if (newValue >= 0 && newValue <= 100) {
-              setLocalValue(newValue); // Update local state
-              onChange(newValue); // Optionally propagate immediately, or adjust as needed
+              throttledOnChange(newValue);
             }
           }}
-          value={localValue} // Use local state for input value
+          value={value}
         />
         <Slider
           id="opacity"
-          value={[localValue]} // Use local state for slider value
+          value={[value]}
           onValueChange={(e) => {
-            setLocalValue(e[0]); // Update local state
-          }}
-          onValueCommit={() => {
-            onChange(localValue); // Propagate value to parent when user commits change
+            throttledOnChange(e[0]);
           }}
           min={0}
           max={100}

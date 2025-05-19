@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
-
 import { Slider } from "@/components/ui/slider";
-import { useEffect, useState } from "react";
+import { useThrottledCallback } from "@tanstack/react-pacer";
+import { THROTTLE_WAIT_MS } from "./constants";
 
 const Speed = ({
   value,
@@ -10,24 +10,23 @@ const Speed = ({
   value: number;
   onChange: (v: number) => void;
 }) => {
-  // Create local state to manage opacity
-  const [localValue, setLocalValue] = useState<string | number>(value);
+  const throttledOnChange = useThrottledCallback(onChange, {
+    wait: THROTTLE_WAIT_MS,
+  });
 
-  // Update local state when prop value changes
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
-
-  const handleBlur = () => {
-    if (localValue !== "") {
-      onChange(Number(localValue)); // Propagate as a number
+  const handleBlur = (inputValue: string) => {
+    if (inputValue !== "") {
+      throttledOnChange(Number(inputValue));
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    inputValue: string,
+  ) => {
     if (e.key === "Enter") {
-      if (localValue !== "") {
-        onChange(Number(localValue)); // Propagate as a number
+      if (inputValue !== "") {
+        throttledOnChange(Number(inputValue));
       }
     }
   };
@@ -47,7 +46,7 @@ const Speed = ({
         <Input
           variant="secondary"
           className="h-8 w-11 px-2 text-center text-sm"
-          value={localValue}
+          value={value}
           onChange={(e) => {
             const newValue = e.target.value;
 
@@ -56,25 +55,25 @@ const Speed = ({
               newValue === "" ||
               (!isNaN(Number(newValue)) && Number(newValue) >= 0)
             ) {
-              setLocalValue(newValue); // Update local state
+              // If it's a valid numeric value, update immediately
+              if (newValue !== "" && !isNaN(Number(newValue))) {
+                throttledOnChange(Number(newValue));
+              }
             }
           }}
-          onBlur={handleBlur} // Trigger onBlur event
-          onKeyDown={handleKeyDown} // Trigger onKeyDown event
+          onBlur={(e) => handleBlur(e.target.value)}
+          onKeyDown={(e) => handleKeyDown(e, e.currentTarget.value)}
         />
         <Slider
           id="opacity"
-          value={[Number(localValue)]} // Use local state for slider value
+          value={[value]}
           onValueChange={(e) => {
-            setLocalValue(e[0]); // Update local state
-          }}
-          onValueCommit={() => {
-            onChange(Number(localValue)); // Propagate value to parent when user commits change
+            throttledOnChange(e[0]);
           }}
           min={0}
           max={4}
           step={0.1}
-          aria-label="Opacity"
+          aria-label="Speed"
         />
       </div>
     </div>

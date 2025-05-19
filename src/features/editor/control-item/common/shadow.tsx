@@ -1,7 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IBoxShadow } from "@designcombo/types";
-import { useEffect, useState } from "react";
 import {
   Popover,
   PopoverContent,
@@ -10,6 +9,9 @@ import {
 import ColorPicker from "@/components/color-picker";
 import { X } from "lucide-react";
 import { DndDraggable, DndProvider } from "../../components/DndDraggable";
+import { useThrottledCallback } from "@tanstack/react-pacer";
+import { THROTTLE_WAIT_MS } from "./constants";
+import { useState } from "react";
 
 function Shadow({
   label,
@@ -20,12 +22,11 @@ function Shadow({
   value: IBoxShadow;
   onChange: (v: IBoxShadow) => void;
 }) {
-  const [localValue, setLocalValue] = useState<IBoxShadow>(value);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
+  const throttledOnChange = useThrottledCallback(onChange, {
+    wait: THROTTLE_WAIT_MS,
+  });
 
   return (
     <div className="flex flex-col gap-2 py-4">
@@ -43,14 +44,14 @@ function Shadow({
             <PopoverTrigger asChild>
               <div className="relative">
                 <div
-                  style={{ backgroundColor: localValue.color }}
+                  style={{ backgroundColor: value.color }}
                   className="absolute left-0.5 top-0.5 h-7 w-7 flex-none cursor-pointer rounded-md border border-border"
                 ></div>
 
                 <Input
                   variant="secondary"
                   className="pointer-events-none h-8 pl-10"
-                  value={localValue.color}
+                  value={value.color}
                   onChange={() => {}}
                 />
               </div>
@@ -76,14 +77,13 @@ function Shadow({
                       </div>
                     </div>
                     <ColorPicker
-                      value={localValue.color}
+                      value={value.color}
                       format="hex"
                       gradient={true}
                       solid={true}
                       onChange={(v) => {
-                        setLocalValue({ ...localValue, color: v });
-                        onChange({
-                          ...localValue,
+                        throttledOnChange({
+                          ...value,
                           color: v,
                         });
                       }}
@@ -105,7 +105,7 @@ function Shadow({
           <Input
             variant="secondary"
             className="h-8"
-            value={localValue.x}
+            value={value.x}
             onChange={(e) => {
               const newValue = e.target.value;
 
@@ -114,19 +114,12 @@ function Shadow({
                 newValue === "" ||
                 (!isNaN(Number(newValue)) && Number(newValue) >= 0)
               ) {
-                setLocalValue((prev) => ({
-                  ...prev,
-                  x: (newValue === ""
-                    ? ""
-                    : Number(newValue)) as unknown as number,
-                })); // Update local state
-
                 // Only propagate if it's a valid number and not empty
                 if (newValue !== "") {
-                  onChange({
-                    ...localValue,
+                  throttledOnChange({
+                    ...value,
                     x: Number(newValue),
-                  }); // Propagate as a number
+                  });
                 }
               }
             }}
@@ -142,7 +135,7 @@ function Shadow({
           <Input
             variant="secondary"
             className="h-8"
-            value={localValue.y}
+            value={value.y}
             onChange={(e) => {
               const newValue = e.target.value;
 
@@ -151,19 +144,12 @@ function Shadow({
                 newValue === "" ||
                 (!isNaN(Number(newValue)) && Number(newValue) >= 0)
               ) {
-                setLocalValue((prev) => ({
-                  ...prev,
-                  y: (newValue === ""
-                    ? ""
-                    : Number(newValue)) as unknown as number,
-                })); // Update local state
-
                 // Only propagate if it's a valid number and not empty
                 if (newValue !== "") {
-                  onChange({
-                    ...localValue,
+                  throttledOnChange({
+                    ...value,
                     y: Number(newValue),
-                  }); // Propagate as a number
+                  });
                 }
               }
             }}
@@ -179,7 +165,7 @@ function Shadow({
           <Input
             variant="secondary"
             className="h-8"
-            value={localValue.blur}
+            value={value.blur}
             onChange={(e) => {
               const newValue = e.target.value;
 
@@ -188,19 +174,12 @@ function Shadow({
                 newValue === "" ||
                 (!isNaN(Number(newValue)) && Number(newValue) >= 0)
               ) {
-                setLocalValue((prev) => ({
-                  ...prev,
-                  blur: (newValue === ""
-                    ? ""
-                    : Number(newValue)) as unknown as number,
-                })); // Update local state
-
                 // Only propagate if it's a valid number and not empty
                 if (newValue !== "") {
-                  onChange({
-                    ...localValue,
+                  throttledOnChange({
+                    ...value,
                     blur: Number(newValue),
-                  }); // Propagate as a number
+                  });
                 }
               }
             }}

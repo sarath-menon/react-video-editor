@@ -1,6 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Popover,
   PopoverContent,
@@ -9,6 +9,8 @@ import {
 import ColorPicker from "@/components/color-picker";
 import { X } from "lucide-react";
 import { DndDraggable, DndProvider } from "../../components/DndDraggable";
+import { useThrottledCallback } from "@tanstack/react-pacer";
+import { THROTTLE_WAIT_MS } from "./constants";
 
 function Outline({
   label,
@@ -23,17 +25,21 @@ function Outline({
   valueBorderWidth: number;
   valueBorderColor: string;
 }) {
-  const [localValueBorderWidth, setLocalValueBorderWidth] = useState<
-    string | number
-  >(valueBorderWidth);
-  const [localValueBorderColor, setLocalValueBorderColor] =
-    useState<string>(valueBorderColor); // Allow for string
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    setLocalValueBorderWidth(valueBorderWidth);
-    setLocalValueBorderColor(valueBorderColor);
-  }, [valueBorderWidth, valueBorderColor]);
+  const throttledOnChangeBorderWidth = useThrottledCallback(
+    onChageBorderWidth,
+    {
+      wait: THROTTLE_WAIT_MS,
+    },
+  );
+
+  const throttledOnChangeBorderColor = useThrottledCallback(
+    onChangeBorderColor,
+    {
+      wait: THROTTLE_WAIT_MS,
+    },
+  );
 
   return (
     <div className="flex flex-col gap-2 py-4">
@@ -52,7 +58,7 @@ function Outline({
               <div className="relative">
                 <div
                   style={{
-                    backgroundColor: localValueBorderColor,
+                    backgroundColor: valueBorderColor,
                   }}
                   className="absolute left-0.5 top-0.5 h-7 w-7 flex-none cursor-pointer rounded-md border border-border"
                 ></div>
@@ -60,7 +66,7 @@ function Outline({
                 <Input
                   variant="secondary"
                   className="pointer-events-none h-8 pl-10"
-                  value={localValueBorderColor}
+                  value={valueBorderColor}
                   onChange={() => {}}
                 />
               </div>
@@ -86,13 +92,12 @@ function Outline({
                       </div>
                     </div>
                     <ColorPicker
-                      value={localValueBorderColor}
+                      value={valueBorderColor}
                       format="hex"
                       gradient={true}
                       solid={true}
                       onChange={(v: string) => {
-                        setLocalValueBorderColor(v);
-                        onChangeBorderColor(v);
+                        throttledOnChangeBorderColor(v);
                       }}
                       allowAddGradientStops={true}
                     />
@@ -123,15 +128,13 @@ function Outline({
                   Number(newValue) >= 0 &&
                   Number(newValue) <= 100)
               ) {
-                setLocalValueBorderWidth(newValue); // Update local state
-
                 // Only propagate if it's a valid number and not empty
                 if (newValue !== "") {
-                  onChageBorderWidth(Number(newValue)); // Propagate as a number
+                  throttledOnChangeBorderWidth(Number(newValue));
                 }
               }
             }}
-            value={localValueBorderWidth} // Use local state for input value
+            value={valueBorderWidth}
           />
         </div>
       </div>

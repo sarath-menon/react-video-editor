@@ -11,24 +11,49 @@ const SceneBoard = ({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   return (
-    <DroppableArea
-      id="artboard"
-      onDragStateChange={setIsDraggingOver}
-      style={{
-        width: size.width,
-        height: size.height,
-      }}
-      className="pointer-events-auto"
-    >
-      <div
+    <div className="scene-board-container" style={{ position: "relative" }}>
+      <DroppableArea
+        id="artboard"
+        onDragStateChange={setIsDraggingOver}
         style={{
           width: size.width,
           height: size.height,
+          overflow: "hidden",
+          position: "relative",
+          contain: "strict", // CSS containment for better performance
         }}
-        className={`pointer-events-none absolute z-50 border border-white/15 transition-colors duration-200 ease-in-out ${isDraggingOver ? "border-4 border-dashed border-white bg-white/[0.075]" : "bg-transparent"} shadow-[0_0_0_5000px_#121213]`}
+        className="pointer-events-auto"
+      >
+        {/* Viewport border */}
+        <div
+          className={`viewport-border ${isDraggingOver ? "dragging-over" : ""}`}
+          style={{
+            position: "absolute",
+            inset: 0,
+            border: isDraggingOver
+              ? "4px dashed white"
+              : "1px solid rgba(255, 255, 255, 0.15)",
+            backgroundColor: isDraggingOver
+              ? "rgba(255, 255, 255, 0.075)"
+              : "transparent",
+            pointerEvents: "none",
+            zIndex: 50,
+          }}
+        />
+        {/* Content container */}
+        {children}
+      </DroppableArea>
+      {/* Background mask as a sibling rather than using a huge shadow */}
+      <div
+        className="background-mask"
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: "#121213",
+          zIndex: -1,
+        }}
       />
-      {children}
-    </DroppableArea>
+    </div>
   );
 };
 

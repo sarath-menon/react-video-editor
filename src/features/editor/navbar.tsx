@@ -23,6 +23,7 @@ import { useDownloadState } from "./store/use-download-state";
 import DownloadProgressModal from "./download-progress-modal";
 import AutosizeInput from "@/components/ui/autosize-input";
 import { debounce } from "lodash";
+import useStore from "./store/use-store";
 
 export default function Navbar({
   stateManager,
@@ -131,6 +132,9 @@ export default function Navbar({
             inputClassName="border-none outline-none px-1 bg-background text-sm font-medium text-zinc-200"
           />
         </div>
+        <div className="bg-sidebar pointer-events-auto">
+          <ViewportSelector />
+        </div>
       </div>
 
       <div className="flex h-14 items-center justify-end gap-2">
@@ -227,105 +231,203 @@ const DownloadPopover = ({ stateManager }: { stateManager: StateManager }) => {
   );
 };
 
-interface ResizeOptionProps {
+interface ViewportSizeOption {
   label: string;
-  icon: string;
-  value: ResizeValue;
-  description: string;
-}
-
-interface ResizeValue {
   width: number;
   height: number;
-  name: string;
+  description: string;
+  category?: string;
+  aspect?: string;
 }
 
-const RESIZE_OPTIONS: ResizeOptionProps[] = [
+// Reorganize viewport options with categories and aspect ratios
+const VIEWPORT_SIZES: ViewportSizeOption[] = [
+  // Social Media - Standard
   {
-    label: "16:9",
-    icon: "landscape",
-    description: "YouTube ads",
-    value: {
-      width: 1920,
-      height: 1080,
-      name: "16:9",
-    },
+    label: "Instagram Post (1080×1080)",
+    width: 1080,
+    height: 1080,
+    description: "Square format for Instagram",
+    category: "Social Media",
+    aspect: "1:1",
   },
   {
-    label: "9:16",
-    icon: "portrait",
-    description: "TikTok, YouTube Shorts",
-    value: {
-      width: 1080,
-      height: 1920,
-      name: "9:16",
-    },
+    label: "Instagram Story (1080×1920)",
+    width: 1080,
+    height: 1920,
+    description: "9:16 for Instagram Stories",
+    category: "Social Media",
+    aspect: "9:16",
   },
   {
-    label: "1:1",
-    icon: "square",
-    description: "Instagram, Facebook posts",
-    value: {
-      width: 1080,
-      height: 1080,
-      name: "1:1",
-    },
+    label: "TikTok/Reels (1080×1920)",
+    width: 1080,
+    height: 1920,
+    description: "Vertical video for TikTok/Reels",
+    category: "Social Media",
+    aspect: "9:16",
+  },
+  {
+    label: "Twitter (1200×675)",
+    width: 1200,
+    height: 675,
+    description: "16:9 for Twitter posts",
+    category: "Social Media",
+    aspect: "16:9",
+  },
+
+  // Video Standards
+  {
+    label: "HD (1280×720)",
+    width: 1280,
+    height: 720,
+    description: "720p HD video",
+    category: "Video Standards",
+    aspect: "16:9",
+  },
+  {
+    label: "Full HD (1920×1080)",
+    width: 1920,
+    height: 1080,
+    description: "1080p video, YouTube standard",
+    category: "Video Standards",
+    aspect: "16:9",
+  },
+  {
+    label: "4K UHD (3840×2160)",
+    width: 3840,
+    height: 2160,
+    description: "4K Ultra HD video",
+    category: "Video Standards",
+    aspect: "16:9",
   },
 ];
 
-const ResizeVideo = () => {
-  const handleResize = (options: ResizeValue) => {
+const ViewportSelector = () => {
+  const { size } = useStore();
+  const [currentOption, setCurrentOption] = useState<ViewportSizeOption | null>(
+    null,
+  );
+
+  // Group options by category
+  const groupedOptions = VIEWPORT_SIZES.reduce(
+    (acc, option) => {
+      const category = option.category || "Other";
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(option);
+      return acc;
+    },
+    {} as Record<string, ViewportSizeOption[]>,
+  );
+
+  // Categories in preferred order
+  const categories = ["Video Standards", "Social Media", "Other"];
+
+  // Find the matching preset or create a custom label
+  useEffect(() => {
+    const matchingOption = VIEWPORT_SIZES.find(
+      (option) => option.width === size.width && option.height === size.height,
+    );
+
+    if (matchingOption) {
+      setCurrentOption(matchingOption);
+    } else {
+      // Create a custom option for non-standard sizes
+      setCurrentOption({
+        label: `${size.width}×${size.height}`,
+        width: size.width,
+        height: size.height,
+        description: "Custom size",
+        aspect: `${size.width}:${size.height}`,
+      });
+    }
+  }, [size]);
+
+  const handleViewportChange = (option: ViewportSizeOption) => {
     dispatch(DESIGN_RESIZE, {
       payload: {
-        ...options,
+        width: option.width,
+        height: option.height,
+        name: option.label,
       },
     });
   };
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button className="border border-border" variant="secondary">
-          Resize
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="z-[250] w-60 px-2.5 py-3">
-        <div className="text-sm">
-          {RESIZE_OPTIONS.map((option, index) => (
-            <ResizeOption
-              key={index}
-              label={option.label}
-              icon={option.icon}
-              value={option.value}
-              handleResize={handleResize}
-              description={option.description}
-            />
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-};
 
-const ResizeOption = ({
-  label,
-  icon,
-  value,
-  description,
-  handleResize,
-}: ResizeOptionProps & { handleResize: (payload: ResizeValue) => void }) => {
-  const Icon = Icons[icon as "text"];
+  // Helper function to render aspect ratio icon
+  const AspectRatioIcon = ({
+    aspect,
+    size = 16,
+  }: {
+    aspect: string;
+    size?: number;
+  }) => {
+    const [width, height] = aspect.split(":").map(Number);
+    const maxDimension = Math.max(width, height);
+    const scaledWidth = (width / maxDimension) * size;
+    const scaledHeight = (height / maxDimension) * size;
+
+    return (
+      <div
+        style={{
+          width: scaledWidth,
+          height: scaledHeight,
+          backgroundColor: "rgba(255,255,255,0.7)",
+          marginRight: 8,
+          minWidth: 8,
+          minHeight: 8,
+        }}
+      />
+    );
+  };
+
   return (
-    <div
-      onClick={() => handleResize(value)}
-      className="flex cursor-pointer items-center rounded-md p-2 hover:bg-zinc-50/10"
-    >
-      <div className="w-8 text-muted-foreground">
-        <Icon size={20} />
-      </div>
-      <div>
-        <div>{label}</div>
-        <div className="text-xs text-muted-foreground">{description}</div>
-      </div>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          className="flex items-center gap-2 border border-border"
+          variant="secondary"
+        >
+          {currentOption?.aspect && (
+            <AspectRatioIcon aspect={currentOption.aspect} />
+          )}
+          <span>{currentOption?.label || "Loading..."}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="z-[250] w-72">
+        {categories.map((category) => {
+          const options = groupedOptions[category];
+          if (!options || options.length === 0) return null;
+
+          return (
+            <div key={category} className="mb-2">
+              <div className="px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">
+                {category}
+              </div>
+              {options.map((option, index) => (
+                <DropdownMenuItem
+                  key={index}
+                  onClick={() => handleViewportChange(option)}
+                  className="flex cursor-pointer items-center py-2"
+                >
+                  {option.aspect && (
+                    <div className="mr-2 flex-shrink-0">
+                      <AspectRatioIcon aspect={option.aspect} size={20} />
+                    </div>
+                  )}
+                  <div className="flex flex-col">
+                    <div className="font-medium">{option.label}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {option.description}
+                    </div>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </div>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };

@@ -44,10 +44,10 @@ export default function Scene({
     const containerWidth = container.clientWidth - PADDING;
     const { width, height } = size;
 
-    const desiredZoom = Math.min(
-      containerWidth / width,
-      containerHeight / height,
-    );
+    // For portrait videos (height > width), prioritize fitting to height
+    // For landscape videos (width > height), prioritize fitting to width
+    const desiredZoom =
+      height > width ? containerHeight / height : containerWidth / width;
 
     // Find the closest preset zoom level
     let closestZoom = ZOOM_LEVELS[0].value;

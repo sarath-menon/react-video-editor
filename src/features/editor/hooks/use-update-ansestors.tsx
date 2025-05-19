@@ -50,13 +50,17 @@ export default function useUpdateAnsestors({
     if (!element) return;
     const handleDoubleClick = (e: MouseEvent) => {
       const type = getTypeFromClassName(element.className);
+      // Always prevent default for double-click to avoid unwanted behavior
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Only enter edit mode for text elements
       if (type === "text") {
         dispatch(ENTER_EDIT_MODE, {
           payload: {
             id: activeIds[0],
           },
         });
-        e.stopPropagation();
       }
     };
     element.addEventListener("dblclick", handleDoubleClick);

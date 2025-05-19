@@ -1,21 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import Selection from "@interactify/selection";
-import Moveable from "@interactify/moveable";
 import { getIdFromClassName } from "../utils/scene";
 import { dispatch } from "@designcombo/events";
 import { EDIT_OBJECT } from "@designcombo/state";
-import {
-  SelectionInfo,
-  emptySelection,
-  getSelectionByIds,
-  getTargetById,
-} from "../utils/target";
+import { getTargetById } from "../utils/target";
 import useStore from "../store/use-store";
 import StateManager from "@designcombo/state";
 import { getCurrentTime } from "../utils/time";
-
-let holdGroupPosition: Record<string, { x: number; y: number }> | null = null;
-let dragStartEnd = false;
 
 interface SceneInteractionsProps {
   stateManager: StateManager;
@@ -24,25 +14,26 @@ interface SceneInteractionsProps {
   zoom: number;
   size: { width: number; height: number };
 }
+
 export function SceneInteractions({
   stateManager,
   boardContainerRef,
   zoom,
 }: Omit<SceneInteractionsProps, "containerRef">) {
   const [targets, setTargets] = useState<HTMLDivElement[]>([]);
-  const [selection, setSelection] = useState<Selection>();
-  const {
-    activeIds,
-    setState,
-    trackItemDetailsMap,
-    trackItemsMap,
-    playerRef,
-    setSceneMoveableRef,
-  } = useStore();
-  const moveableRef = useRef<Moveable>(null);
-  const [selectionInfo, setSelectionInfo] =
-    useState<SelectionInfo>(emptySelection);
+  const selectionBoxRef = useRef<HTMLDivElement>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [selectionBox, setSelectionBox] = useState({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+  });
 
+  const { activeIds, setState, trackItemsMap, playerRef } = useStore();
+
+  // Update targets based on player time
   useEffect(() => {
     const updateTargets = (time?: number) => {
       const currentTime = time || getCurrentTime();
@@ -53,15 +44,13 @@ export function SceneInteractions({
           trackItemsMap[id]?.display.to >= currentTime
         );
       });
-      const targets = targetIds.map(
-        (id) => getTargetById(id) as HTMLDivElement,
-      );
-      selection?.setSelectedTargets(targets);
-      const selInfo = getSelectionByIds(targetIds);
+      const selectedElements = targetIds
+        .map((id) => getTargetById(id) as HTMLDivElement)
+        .filter(Boolean);
 
-      setSelectionInfo(selInfo);
-      setTargets(selInfo.targets as HTMLDivElement[]);
+      setTargets(selectedElements);
     };
+
     const timer = setTimeout(() => {
       updateTargets();
     });
@@ -81,78 +70,110 @@ export function SceneInteractions({
     };
   }, [activeIds, playerRef, trackItemsMap]);
 
+  // Selection and dragging functionality
   useEffect(() => {
-    const selection = new Selection({
-      container: boardContainerRef.current,
-      boundContainer: true,
-      hitRate: 0,
-      selectableTargets: [".designcombo-scene-item"],
-      selectFromInside: false,
-      selectByClick: true,
-      toggleContinueSelect: "shift",
-    })
-      .on("select", (e) => {
-        const ids = e.selected.map((el) => getIdFromClassName(el.className));
-        setTargets(e.selected as HTMLDivElement[]);
+    const container = boardContainerRef.current;
+    if (!container) return;
 
+    // Handle selection box
+    const handleMouseDown = (e: MouseEvent) => {
+      // Check if clicking on a scene item or its child elements
+      const target = e.target as HTMLElement;
+      const closestSceneItem = target.closest(".designcombo-scene-item");
+
+      if (closestSceneItem) {
+        // This is a click on a scene item
+        const id = getIdFromClassName(closestSceneItem.className);
+
+        // Update active selection in state
         stateManager.updateState(
-          {
-            activeIds: ids,
-          },
-          {
-            updateHistory: false,
-            kind: "layer:selection",
-          },
+          { activeIds: [id] },
+          { updateHistory: false, kind: "layer:selection" },
         );
-      })
-      .on("dragStart", (e) => {
-        const target = e.inputEvent.target as HTMLDivElement;
-        dragStartEnd = false;
 
-        if (targets.includes(target)) {
-          e.stop();
-        }
-        if (
-          target &&
-          moveableRef?.current?.moveable.isMoveableElement(target)
-        ) {
-          e.stop();
-        }
-      })
-      .on("dragEnd", () => {
-        dragStartEnd = true;
-      })
-      .on("selectEnd", (e) => {
-        const moveable = moveableRef.current;
-        if (e.isDragStart) {
-          e.inputEvent.preventDefault();
-          setTimeout(() => {
-            if (!dragStartEnd) {
-              moveable?.moveable.dragStart(e.inputEvent);
-            }
-          });
-        } else {
-          const targets = e.selected as HTMLDivElement[];
-          const ids = targets.map((el) => getIdFromClassName(el.className));
-
-          stateManager.updateState(
-            {
-              activeIds: ids,
-            },
-            {
-              updateHistory: false,
-              kind: "layer:selection",
-            },
-          );
-          setTargets(targets);
-        }
-      });
-    setSelection(selection);
-    return () => {
-      selection.destroy();
+        setTargets([closestSceneItem as HTMLDivElement]);
+        e.stopPropagation();
+      } else {
+        // This is a selection box on empty space
+        setIsSelecting(true);
+        setStartPos({ x: e.clientX, y: e.clientY });
+        setSelectionBox({ x: e.clientX, y: e.clientY, width: 0, height: 0 });
+      }
     };
-  }, []);
 
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isSelecting) return;
+
+      const currentX = e.clientX;
+      const currentY = e.clientY;
+
+      setSelectionBox({
+        x: Math.min(startPos.x, currentX),
+        y: Math.min(startPos.y, currentY),
+        width: Math.abs(currentX - startPos.x),
+        height: Math.abs(currentY - startPos.y),
+      });
+    };
+
+    const handleMouseUp = () => {
+      if (!isSelecting) return;
+      setIsSelecting(false);
+
+      // Find elements within selection box
+      if (selectionBox.width > 5 && selectionBox.height > 5) {
+        const boxRect = {
+          left: selectionBox.x,
+          top: selectionBox.y,
+          right: selectionBox.x + selectionBox.width,
+          bottom: selectionBox.y + selectionBox.height,
+        };
+
+        const selectedElements: HTMLDivElement[] = [];
+        const items = document.querySelectorAll(".designcombo-scene-item");
+
+        items.forEach((item) => {
+          const rect = item.getBoundingClientRect();
+          if (
+            rect.left < boxRect.right &&
+            rect.right > boxRect.left &&
+            rect.top < boxRect.bottom &&
+            rect.bottom > boxRect.top
+          ) {
+            selectedElements.push(item as HTMLDivElement);
+          }
+        });
+
+        // Update selection
+        const ids = selectedElements.map((el) =>
+          getIdFromClassName(el.className),
+        );
+        stateManager.updateState(
+          { activeIds: ids },
+          { updateHistory: false, kind: "layer:selection" },
+        );
+        setTargets(selectedElements);
+      } else if (selectionBox.width < 5 && selectionBox.height < 5) {
+        // Clear selection when clicking empty space
+        stateManager.updateState(
+          { activeIds: [] },
+          { updateHistory: false, kind: "layer:selection" },
+        );
+        setTargets([]);
+      }
+    };
+
+    container.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      container.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [boardContainerRef, isSelecting, startPos, selectionBox, stateManager]);
+
+  // Active IDs subscription
   useEffect(() => {
     const activeSelectionSubscription = stateManager.subscribeToActiveIds(
       (newState) => {
@@ -163,232 +184,118 @@ export function SceneInteractions({
     return () => {
       activeSelectionSubscription.unsubscribe();
     };
-  }, []);
+  }, [stateManager, setState]);
 
+  // Handle dragging selected elements
   useEffect(() => {
-    moveableRef.current!.moveable.updateRect();
-  }, [trackItemsMap]);
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const sceneItem = target.closest(".designcombo-scene-item");
 
-  useEffect(() => {
-    setSceneMoveableRef(moveableRef);
-  }, [moveableRef]);
-  return (
-    <Moveable
-      ref={moveableRef}
-      rotationPosition={"bottom"}
-      renderDirections={selectionInfo.controls}
-      {...selectionInfo.ables}
-      origin={false}
-      target={targets}
-      zoom={1 / zoom}
-      className="designcombo-scene-moveable"
-      onDrag={({ target, top, left }) => {
-        target.style.top = top + "px";
-        target.style.left = left + "px";
-      }}
-      onDragEnd={({ target, isDrag }) => {
-        if (!isDrag) return;
-        const targetId = getIdFromClassName(target.className) as string;
+      if (!sceneItem || targets.length === 0) return;
 
-        dispatch(EDIT_OBJECT, {
-          payload: {
-            [targetId]: {
-              details: {
-                left: target.style.left,
-                top: target.style.top,
-              },
-            },
-          },
+      // Check if the clicked item is part of the selection
+      if (!targets.includes(sceneItem as HTMLDivElement)) return;
+
+      const initialPositions = targets.map((item) => {
+        const rect = item.getBoundingClientRect();
+        return {
+          element: item,
+          initialX: rect.left,
+          initialY: rect.top,
+          currentX: e.clientX,
+          currentY: e.clientY,
+        };
+      });
+
+      const handleDragMove = (moveEvent: MouseEvent) => {
+        const dx = moveEvent.clientX - e.clientX;
+        const dy = moveEvent.clientY - e.clientY;
+
+        initialPositions.forEach((item) => {
+          const left = item.initialX + dx;
+          const top = item.initialY + dy;
+          item.element.style.left = `${left}px`;
+          item.element.style.top = `${top}px`;
         });
-      }}
-      onScale={({ target, transform, direction }) => {
-        const [xControl, yControl] = direction;
+      };
 
-        const moveX = xControl === -1;
-        const moveY = yControl === -1;
+      const handleDragEnd = () => {
+        // Update positions in store
+        const payload: Record<
+          string,
+          { details: { left: string; top: string } }
+        > = {};
 
-        const scaleRegex = /scale\(([^)]+)\)/;
-        const match = target.style.transform.match(scaleRegex)!;
-
-        //get current scale
-        const [scaleX, scaleY] = match[1]
-          .split(",")
-          .map((value) => parseFloat(value.trim()));
-
-        //get new Scale
-        const match2 = transform.match(scaleRegex)!;
-        const [newScaleX, newScaleY] = match2[1]
-          .split(",")
-          .map((value) => parseFloat(value.trim()));
-
-        const currentWidth = target.clientWidth * scaleX;
-        const currentHeight = target.clientHeight * scaleY;
-
-        const newWidth = target.clientWidth * newScaleX;
-        const newHeight = target.clientHeight * newScaleY;
-
-        target.style.transform = transform;
-
-        //Move element to initial Left position
-        const diffX = currentWidth - newWidth;
-        let newLeft = parseFloat(target.style.left) - diffX / 2;
-
-        const diffY = currentHeight - newHeight;
-        let newTop = parseFloat(target.style.top) - diffY / 2;
-
-        if (moveX) {
-          newLeft += diffX;
-        }
-        if (moveY) {
-          newTop += diffY;
-        }
-        target.style.left = newLeft + "px";
-        target.style.top = newTop + "px";
-      }}
-      onScaleEnd={({ target }) => {
-        if (!target.style.transform) return;
-        const targetId = getIdFromClassName(target.className) as string;
-
-        dispatch(EDIT_OBJECT, {
-          payload: {
-            [targetId]: {
-              details: {
-                transform: target.style.transform,
-                left: parseFloat(target.style.left),
-                top: parseFloat(target.style.top),
-              },
+        initialPositions.forEach((item) => {
+          const id = getIdFromClassName(item.element.className);
+          payload[id] = {
+            details: {
+              left: item.element.style.left,
+              top: item.element.style.top,
             },
-          },
-        });
-      }}
-      onRotate={({ target, transform }) => {
-        target.style.transform = transform;
-      }}
-      onRotateEnd={({ target }) => {
-        if (!target.style.transform) return;
-        const targetId = getIdFromClassName(target.className) as string;
-        dispatch(EDIT_OBJECT, {
-          payload: {
-            [targetId]: {
-              details: {
-                transform: target.style.transform,
-              },
-            },
-          },
-        });
-      }}
-      onDragGroup={({ events }) => {
-        holdGroupPosition = {};
-        for (let i = 0; i < events.length; i++) {
-          const event = events[i];
-          const id = getIdFromClassName(event.target.className);
-          const trackItem = trackItemDetailsMap[id];
-          const left =
-            parseFloat(trackItem?.details.left as string) +
-            event.beforeTranslate[0];
-          const top =
-            parseFloat(trackItem?.details.top as string) +
-            event.beforeTranslate[1];
-          event.target.style.left = `${left}px`;
-          event.target.style.top = `${top}px`;
-          holdGroupPosition[id] = {
-            x: left,
-            y: top,
           };
-        }
-      }}
-      onResize={({
-        target,
-        width: nextWidth,
-        height: nextHeight,
-        direction,
-      }) => {
-        if (direction[1] === 1) {
-          const currentWidth = target.clientWidth;
-          const currentHeight = target.clientHeight;
-
-          // Get new width and height
-          const scaleY = nextHeight / currentHeight;
-          const scale = scaleY;
-
-          // Update target dimensions
-          target.style.width = `${currentWidth * scale}px`;
-          target.style.height = `${currentHeight * scale}px`;
-
-          // Safely access nested elements
-          const animationDiv = target.firstElementChild
-            ?.firstElementChild as HTMLDivElement | null;
-          if (animationDiv) {
-            animationDiv.style.width = `${currentWidth * scale}px`;
-            animationDiv.style.height = `${currentHeight * scale}px`;
-
-            const textDiv =
-              animationDiv.firstElementChild as HTMLDivElement | null;
-            if (textDiv) {
-              const fontSize = parseFloat(getComputedStyle(textDiv).fontSize);
-              textDiv.style.fontSize = `${fontSize * scale}px`;
-              textDiv.style.width = `${currentWidth * scale}px`;
-              textDiv.style.height = `${currentHeight * scale}px`;
-            }
-          }
-        } else {
-          target.style.width = nextWidth + "px";
-          target.style.height = nextHeight + "px";
-
-          // Safely access nested elements
-          const animationDiv = target.firstElementChild
-            ?.firstElementChild as HTMLDivElement | null;
-          if (animationDiv) {
-            animationDiv.style.width = `${nextWidth}px`;
-            animationDiv.style.height = `${nextHeight}px`;
-
-            const textDiv =
-              animationDiv.firstElementChild as HTMLDivElement | null;
-            if (textDiv) {
-              textDiv.style.width = `${nextWidth}px`;
-              textDiv.style.height = `${nextHeight}px`;
-            }
-          }
-        }
-      }}
-      onResizeEnd={({ target }) => {
-        const targetId = getIdFromClassName(target.className) as string;
-        const textDiv = target.firstElementChild?.firstElementChild
-          ?.firstElementChild as HTMLDivElement;
-        dispatch(EDIT_OBJECT, {
-          payload: {
-            [targetId]: {
-              details: {
-                width: parseFloat(target.style.width),
-                height: parseFloat(target.style.height),
-                fontSize: parseFloat(textDiv.style.fontSize),
-              },
-            },
-          },
         });
-      }}
-      onDragGroupEnd={() => {
-        if (holdGroupPosition) {
-          const payload: Record<
-            string,
-            { details: { left: string; top: string } }
-          > = {};
-          Object.keys(holdGroupPosition).forEach((id) => {
-            const left = holdGroupPosition![id].x;
-            const top = holdGroupPosition![id].y;
-            payload[id] = {
-              details: {
-                top: `${top}px`,
-                left: `${left}px`,
-              },
-            };
-          });
-          dispatch(EDIT_OBJECT, {
-            payload: payload,
-          });
-          holdGroupPosition = null;
-        }
-      }}
-    />
+
+        dispatch(EDIT_OBJECT, { payload });
+
+        document.removeEventListener("mousemove", handleDragMove);
+        document.removeEventListener("mouseup", handleDragEnd);
+      };
+
+      document.addEventListener("mousemove", handleDragMove);
+      document.addEventListener("mouseup", handleDragEnd);
+    };
+
+    // Attach event listeners for dragging
+    targets.forEach((target) => {
+      target.addEventListener("mousedown", handleMouseDown);
+    });
+
+    return () => {
+      targets.forEach((target) => {
+        target.removeEventListener("mousedown", handleMouseDown);
+      });
+    };
+  }, [targets]);
+
+  return (
+    <>
+      {isSelecting && (
+        <div
+          ref={selectionBoxRef}
+          style={{
+            position: "fixed",
+            left: selectionBox.x + "px",
+            top: selectionBox.y + "px",
+            width: selectionBox.width + "px",
+            height: selectionBox.height + "px",
+            border: "1px solid #00a0ff",
+            backgroundColor: "rgba(0, 160, 255, 0.1)",
+            pointerEvents: "none",
+            zIndex: 1000,
+          }}
+        />
+      )}
+      {targets.map((target, index) => (
+        <div
+          key={index}
+          className="resize-handle-container"
+          style={{
+            position: "absolute",
+            left: target.style.left,
+            top: target.style.top,
+            width: target.offsetWidth + "px",
+            height: target.offsetHeight + "px",
+            border: "1px solid #00a0ff",
+            pointerEvents: "none",
+            zIndex: 999,
+            transform: `scale(${1 / zoom})`,
+          }}
+        >
+          {/* Resize handles would go here */}
+        </div>
+      ))}
+    </>
   );
 }

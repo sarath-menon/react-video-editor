@@ -6,8 +6,8 @@ import React, { useRef } from "react";
 import { Animation, presets } from "../../player/animated";
 import useLayoutStore from "../../store/use-layout-store";
 import useClickOutside from "../../hooks/useClickOutside";
-import Draggable from "react-draggable";
 import { PresetName } from "../../player/animated/presets";
+import { DndDraggable, DndProvider } from "../../components/DndDraggable";
 
 const AnimationCaption = () => {
   const { setFloatingControl, trackItem } = useLayoutStore();
@@ -40,16 +40,14 @@ const AnimationCaption = () => {
       .filter(filter)
       .map((presetKey) => {
         const preset = presets[presetKey as "scaleIn"];
-        const style = React.useMemo(
-          () => ({
-            backgroundImage: `url(${preset.previewUrl})`,
-            backgroundSize: "cover",
-            width: "50px",
-            height: "50px",
-            borderRadius: "8px",
-          }),
-          [preset.previewUrl],
-        );
+        const style = {
+          backgroundImage: `url(${preset.previewUrl})`,
+          backgroundSize: "cover",
+          width: "50px",
+          height: "50px",
+          borderRadius: "8px",
+        };
+
         if (
           preset.property?.toLowerCase().includes("text") ||
           preset.property?.toLowerCase().includes("shake")
@@ -76,28 +74,34 @@ const AnimationCaption = () => {
 
   useClickOutside(floatingRef, () => setFloatingControl(""));
   return (
-    <Draggable handle=".handle">
-      <div
-        className="bg-sidebar absolute right-2 top-2 z-[200] h-[calc(100%-80px)] w-56 border p-0"
-        ref={floatingRef}
+    <DndProvider>
+      <DndDraggable
+        id="animation-caption"
+        handle={true}
+        handleClassName="handle"
       >
-        <div className="flex h-full flex-col gap-2 p-4">
-          <div className="handle flex cursor-grab justify-between">
-            <p>Animations</p>
-            <div className="h-4 w-4" onClick={() => setFloatingControl("")}>
-              <X className="h-3 w-3 cursor-pointer font-extrabold text-muted-foreground" />
+        <div
+          className="bg-sidebar absolute right-2 top-2 z-[200] h-[calc(100%-80px)] w-56 border p-0"
+          ref={floatingRef}
+        >
+          <div className="flex h-full flex-col gap-2 p-4">
+            <div className="handle flex cursor-grab justify-between">
+              <p>Animations</p>
+              <div className="h-4 w-4" onClick={() => setFloatingControl("")}>
+                <X className="h-3 w-3 cursor-pointer font-extrabold text-muted-foreground" />
+              </div>
+            </div>
+            <div className="h-full overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="grid grid-cols-3 gap-2 py-4">
+                  {[...Array(4)].flatMap(() => presetInButtons)}
+                </div>{" "}
+              </ScrollArea>
             </div>
           </div>
-          <div className="h-full overflow-hidden">
-            <ScrollArea className="h-full">
-              <div className="grid grid-cols-3 gap-2 py-4">
-                {[...Array(4)].flatMap(() => presetInButtons)}
-              </div>{" "}
-            </ScrollArea>
-          </div>
         </div>
-      </div>
-    </Draggable>
+      </DndDraggable>
+    </DndProvider>
   );
 };
 

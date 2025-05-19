@@ -6,7 +6,7 @@ import { CircleOff, XIcon } from "lucide-react";
 import useLayoutStore from "../../store/use-layout-store";
 import { useRef } from "react";
 import useClickOutside from "../../hooks/useClickOutside";
-import Draggable from "react-draggable";
+import { DndDraggable, DndProvider } from "../../components/DndDraggable";
 
 interface IBoxShadow {
   color: string;
@@ -145,11 +145,11 @@ const getTextShadow = (boxShadow?: IBoxShadow): string | undefined => {
 export default function TextPresetPicker({
   trackItem,
 }: {
-  trackItem: ITrackItem & any;
+  trackItem: ITrackItem;
 }) {
-  const applyPreset = (preset: any) => {
+  const applyPreset = (preset: ITextPreset) => {
     console.log(preset);
-    const overrides: any = {};
+    const overrides = {};
     if (preset.boxShadow === undefined) {
       preset.boxShadow = { color: "transparent", x: 0, y: 0, blur: 0 };
     }
@@ -168,52 +168,58 @@ export default function TextPresetPicker({
   useClickOutside(floatingRef, () => setFloatingControl(""));
 
   return (
-    <Draggable handle=".handle">
-      <div
-        ref={floatingRef}
-        className="absolute right-2 top-2 z-[200] w-56 border bg-sidebar p-0"
+    <DndProvider>
+      <DndDraggable
+        id="text-preset-picker"
+        handle={true}
+        handleClassName="handle"
       >
-        <div className="handle flex cursor-grab items-center justify-between px-4 py-3">
-          <p className="text-sm font-bold">Presets</p>
-          <div className="h-4 w-4" onClick={() => setFloatingControl("")}>
-            <XIcon className="h-3 w-3 cursor-pointer font-extrabold text-muted-foreground" />
-          </div>
-        </div>
-
-        <ScrollArea className="h-[400px] w-full py-0">
-          <div className="grid grid-cols-3 gap-2 px-4">
-            <div
-              onClick={() => applyPreset(NONE_PRESET)}
-              className="flex h-[70px] cursor-pointer items-center justify-center bg-zinc-800"
-            >
-              <CircleOff />
+        <div
+          ref={floatingRef}
+          className="bg-sidebar absolute right-2 top-2 z-[200] w-56 border p-0"
+        >
+          <div className="handle flex cursor-grab items-center justify-between px-4 py-3">
+            <p className="text-sm font-bold">Presets</p>
+            <div className="h-4 w-4" onClick={() => setFloatingControl("")}>
+              <XIcon className="h-3 w-3 cursor-pointer font-extrabold text-muted-foreground" />
             </div>
-
-            {TEXT_PRESETS.map((preset, index) => (
-              <div
-                key={index}
-                onClick={() => applyPreset(preset)}
-                className="text-md flex h-[70px] cursor-pointer items-center justify-center bg-zinc-800"
-              >
-                <div
-                  style={{
-                    backgroundColor: preset.backgroundColor,
-                    color: preset.color,
-                    borderRadius: `${preset.borderRadius}px`,
-                    WebkitTextStroke: `2px ${preset.borderColor}`,
-                    paintOrder: "stroke fill",
-                    fontWeight: "bold",
-                    textShadow: getTextShadow(preset.boxShadow),
-                  }}
-                  className="h-6 place-content-center px-2"
-                >
-                  Text
-                </div>
-              </div>
-            ))}
           </div>
-        </ScrollArea>
-      </div>
-    </Draggable>
+
+          <ScrollArea className="h-[400px] w-full py-0">
+            <div className="grid grid-cols-3 gap-2 px-4">
+              <div
+                onClick={() => applyPreset(NONE_PRESET)}
+                className="flex h-[70px] cursor-pointer items-center justify-center bg-zinc-800"
+              >
+                <CircleOff />
+              </div>
+
+              {TEXT_PRESETS.map((preset, index) => (
+                <div
+                  key={index}
+                  onClick={() => applyPreset(preset)}
+                  className="text-md flex h-[70px] cursor-pointer items-center justify-center bg-zinc-800"
+                >
+                  <div
+                    style={{
+                      backgroundColor: preset.backgroundColor,
+                      color: preset.color,
+                      borderRadius: `${preset.borderRadius}px`,
+                      WebkitTextStroke: `2px ${preset.borderColor}`,
+                      paintOrder: "stroke fill",
+                      fontWeight: "bold",
+                      textShadow: getTextShadow(preset.boxShadow),
+                    }}
+                    className="h-6 place-content-center px-2"
+                  >
+                    Text
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      </DndDraggable>
+    </DndProvider>
   );
 }

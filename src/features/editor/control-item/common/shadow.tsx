@@ -8,8 +8,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import ColorPicker from "@/components/color-picker";
-import Draggable from "react-draggable";
 import { X } from "lucide-react";
+import { DndDraggable, DndProvider } from "../../components/DndDraggable";
 
 function Shadow({
   label,
@@ -56,37 +56,43 @@ function Shadow({
               </div>
             </PopoverTrigger>
 
-            <Draggable handle=".drag-handle">
+            <DndProvider>
               <PopoverContent className="absolute bottom-[-3.5rem] right-[460px] z-[300] w-full p-0">
-                <div className="drag-handle flex w-[266px] cursor-grab justify-between rounded-t-lg bg-popover px-4 pt-4">
-                  <p className="text-sm font-bold">Shadow</p>
-                  <div
-                    className="h-4 w-4"
-                    onClick={() => {
-                      setOpen(false);
-                    }}
-                  >
-                    <X className="h-4 w-4 cursor-pointer font-extrabold text-muted-foreground" />
+                <DndDraggable
+                  id="shadow-color-picker"
+                  handle={true}
+                  handleClassName="drag-handle"
+                >
+                  <div>
+                    <div className="drag-handle flex w-[266px] cursor-grab justify-between rounded-t-lg bg-popover px-4 pt-4">
+                      <p className="text-sm font-bold">Shadow</p>
+                      <div
+                        className="h-4 w-4"
+                        onClick={() => {
+                          setOpen(false);
+                        }}
+                      >
+                        <X className="h-4 w-4 cursor-pointer font-extrabold text-muted-foreground" />
+                      </div>
+                    </div>
+                    <ColorPicker
+                      value={localValue.color}
+                      format="hex"
+                      gradient={true}
+                      solid={true}
+                      onChange={(v) => {
+                        setLocalValue({ ...localValue, color: v });
+                        onChange({
+                          ...localValue,
+                          color: v,
+                        });
+                      }}
+                      allowAddGradientStops={true}
+                    />
                   </div>
-                </div>
-                <ColorPicker
-                  value={localValue.color}
-                  format="hex"
-                  gradient={true}
-                  solid={true}
-                  onChange={(v) => {
-                    // setLocalValueBorderColor(v);
-                    // onChangeBorderColor(v);
-                    setLocalValue({ ...localValue, color: v });
-                    onChange({
-                      ...localValue,
-                      color: v,
-                    });
-                  }}
-                  allowAddGradientStops={true}
-                />
+                </DndDraggable>
               </PopoverContent>
-            </Draggable>
+            </DndProvider>
           </Popover>
         </div>
       </div>

@@ -17,8 +17,8 @@ import { Label } from "@/components/ui/label";
 import ColorPicker from "@/components/color-picker";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ICompactFont, IFont } from "../../interfaces/editor";
-import Draggable from "react-draggable";
 import useLayoutStore from "../../store/use-layout-store";
+import { DndDraggable, DndProvider } from "../../components/DndDraggable";
 
 interface TextControlsProps {
   trackItem: ITrackItem & any;
@@ -121,37 +121,46 @@ const FontBackground = ({
             </div>
           </PopoverTrigger>
 
-          <Draggable handle=".drag-handle">
+          <DndProvider>
             <PopoverContent className="absolute bottom-[-15rem] right-[460px] z-[300] w-full p-0">
-              <div className="drag-handle flex w-[266px] cursor-grab justify-between rounded-t-lg bg-popover px-4 pt-4">
-                <p className="text-sm font-bold">Fill</p>
-                <div
-                  className="h-4 w-4"
-                  onClick={() => {
-                    setOpen(false);
-                  }}
-                >
-                  <X className="h-4 w-4 cursor-pointer font-extrabold text-muted-foreground" />
+              <DndDraggable
+                id="color-picker-fill"
+                handle={true}
+                handleClassName="drag-handle"
+              >
+                <div>
+                  <div className="drag-handle flex w-[266px] cursor-grab justify-between rounded-t-lg bg-popover px-4 pt-4">
+                    <p className="text-sm font-bold">Fill</p>
+                    <div
+                      className="h-4 w-4"
+                      onClick={() => {
+                        setOpen(false);
+                      }}
+                    >
+                      <X className="h-4 w-4 cursor-pointer font-extrabold text-muted-foreground" />
+                    </div>
+                  </div>
+                  <ColorPicker
+                    value={localValue}
+                    format="hex"
+                    gradient={true}
+                    solid={true}
+                    onChange={(v: string) => {
+                      setLocalValue(v);
+                      handleColorChange(v);
+                    }}
+                    allowAddGradientStops={true}
+                  />
                 </div>
-              </div>
-              <ColorPicker
-                value={localValue}
-                format="hex"
-                gradient={true}
-                solid={true}
-                onChange={(v: string) => {
-                  setLocalValue(v);
-                  handleColorChange(v);
-                }}
-                allowAddGradientStops={true}
-              />
+              </DndDraggable>
             </PopoverContent>
-          </Draggable>
+          </DndProvider>
         </Popover>
       </div>
     </div>
   );
 };
+
 const FontColor = ({
   value,
   handleColorChange,
@@ -186,32 +195,41 @@ const FontColor = ({
               />
             </div>
           </PopoverTrigger>
-          <Draggable handle=".drag-handle">
+
+          <DndProvider>
             <PopoverContent className="absolute bottom-[-15rem] right-[460px] z-[300] w-full p-0">
-              <div className="drag-handle flex w-[266px] cursor-grab justify-between rounded-t-lg bg-popover px-4 pt-4">
-                <p className="text-sm font-bold">Color</p>
-                <div
-                  className="h-4 w-4"
-                  onClick={() => {
-                    setOpen(false);
-                  }}
-                >
-                  <X className="h-4 w-4 cursor-pointer font-extrabold text-muted-foreground" />
+              <DndDraggable
+                id="color-picker-color"
+                handle={true}
+                handleClassName="drag-handle"
+              >
+                <div>
+                  <div className="drag-handle flex w-[266px] cursor-grab justify-between rounded-t-lg bg-popover px-4 pt-4">
+                    <p className="text-sm font-bold">Color</p>
+                    <div
+                      className="h-4 w-4"
+                      onClick={() => {
+                        setOpen(false);
+                      }}
+                    >
+                      <X className="h-4 w-4 cursor-pointer font-extrabold text-muted-foreground" />
+                    </div>
+                  </div>
+                  <ColorPicker
+                    value={localValue}
+                    format="hex"
+                    gradient={true}
+                    solid={true}
+                    onChange={(v: string) => {
+                      setLocalValue(v);
+                      handleColorChange(v);
+                    }}
+                    allowAddGradientStops={true}
+                  />
                 </div>
-              </div>
-              <ColorPicker
-                value={localValue}
-                format="hex"
-                gradient={true}
-                solid={true}
-                onChange={(v: string) => {
-                  setLocalValue(v);
-                  handleColorChange(v);
-                }}
-                allowAddGradientStops={true}
-              />
+              </DndDraggable>
             </PopoverContent>
-          </Draggable>
+          </DndProvider>
         </Popover>
       </div>
     </div>

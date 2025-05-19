@@ -21,32 +21,43 @@ import { LassoSelect } from "lucide-react";
 const Container = ({ children }: { children: React.ReactNode }) => {
   const { activeIds, trackItemsMap, trackItemDetailsMap, transitionsMap } =
     useStore();
-  const [trackItem, setTrackItem] = useState<ITrackItem | null>(null);
+  const [trackItem, setTrackItem] = useState<ITrackItemAndDetails | null>(null);
   const { setTrackItem: setLayoutTrackItem } = useLayoutStore();
 
   useEffect(() => {
     if (activeIds.length === 1) {
       const [id] = activeIds;
       const trackItemDetails = trackItemDetailsMap[id];
-      const trackItem = {
-        ...trackItemsMap[id],
-        details: trackItemDetails?.details || {},
-      };
       if (trackItemDetails) {
-        setTrackItem(trackItem);
-        setLayoutTrackItem(trackItem);
-      } else console.log(transitionsMap[id]);
+        const fullTrackItem = {
+          ...trackItemsMap[id],
+          details: trackItemDetails?.details || {},
+        } as ITrackItemAndDetails;
+        setTrackItem(fullTrackItem);
+        setLayoutTrackItem(fullTrackItem);
+      } else if (transitionsMap[id]) {
+        // Handle transitions if needed
+      }
     } else {
       setTrackItem(null);
       setLayoutTrackItem(null);
     }
-  }, [activeIds, trackItemsMap]);
+  }, [
+    activeIds,
+    trackItemsMap,
+    trackItemDetailsMap,
+    transitionsMap,
+    setLayoutTrackItem,
+  ]);
 
   return (
-    <div className="flex w-[272px] flex-none border-l border-border/80 bg-sidebar">
-      {React.cloneElement(children as React.ReactElement<any>, {
-        trackItem,
-      })}
+    <div className="bg-sidebar flex w-[272px] flex-none border-l border-border/80">
+      {React.cloneElement(
+        children as React.ReactElement<{ trackItem?: ITrackItemAndDetails }>,
+        {
+          trackItem,
+        },
+      )}
     </div>
   );
 };
@@ -57,7 +68,6 @@ const ActiveControlItem = ({
   trackItem?: ITrackItemAndDetails;
 }) => {
   if (!trackItem) {
-    console.log("No item selected");
     return (
       <div className="mb-32 flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
         <LassoSelect />

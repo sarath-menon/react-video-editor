@@ -5,11 +5,12 @@ import { dispatch } from "@designcombo/events";
 import useStore from "../../store/use-store";
 import { Animation, presets } from "../../player/animated";
 import React, { useRef } from "react";
-import Draggable from "react-draggable";
 import useLayoutStore from "../../store/use-layout-store";
 import useClickOutside from "../../hooks/useClickOutside";
 import { Easing } from "remotion";
 import { PresetName } from "../../player/animated/presets";
+import { DndDraggable, DndProvider } from "../../components/DndDraggable";
+
 const animationType = "media";
 
 export default function AnimationPicker() {
@@ -20,7 +21,7 @@ export default function AnimationPicker() {
       console.warn("No active ID to apply the animation to.");
       return;
     }
-    const presetAnimation: any = presets[presetName];
+    const presetAnimation: Animation = presets[presetName];
     const composition: Animation[] = [presetAnimation];
     if (presetName.includes("rotate") && presetName.includes("In"))
       composition.push(presets.scaleIn);
@@ -82,16 +83,14 @@ export default function AnimationPicker() {
       .map((presetKey) => {
         const preset = presets[presetKey as "scaleIn"];
 
-        const style = React.useMemo(
-          () => ({
-            backgroundImage: `url(${preset.previewUrl})`,
-            backgroundSize: "cover",
-            width: "60px",
-            height: "60px",
-            borderRadius: "8px",
-          }),
-          [preset.previewUrl],
-        );
+        const style = {
+          backgroundImage: `url(${preset.previewUrl})`,
+          backgroundSize: "cover",
+          width: "60px",
+          height: "60px",
+          borderRadius: "8px",
+        };
+
         if (
           animationType === "media" &&
           preset.property?.toLowerCase().includes("text")
@@ -122,33 +121,41 @@ export default function AnimationPicker() {
 
   useClickOutside(floatingRef, () => setFloatingControl(""));
   return (
-    <Draggable handle=".handle">
-      <div
-        ref={floatingRef}
-        className="bg-sidebar absolute right-2 top-2 z-[200] w-56 border p-0"
+    <DndProvider>
+      <DndDraggable
+        id="animation-picker"
+        handle={true}
+        handleClassName="handle"
       >
-        <div className="handle flex cursor-grab items-center justify-between px-4 py-3">
-          <p className="text-sm font-bold">Animations</p>
-          <div className="h-4 w-4" onClick={() => setFloatingControl("")}>
-            <X className="h-3 w-3 cursor-pointer font-extrabold text-muted-foreground" />
-          </div>
-        </div>
-
-        <Tabs defaultValue="in" className="w-full px-2">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="in">In</TabsTrigger>
-            <TabsTrigger value="out">Out</TabsTrigger>
-          </TabsList>
-          <TabsContent value="in">
-            <div className="grid grid-cols-3 gap-2 py-4">{presetInButtons}</div>
-          </TabsContent>
-          <TabsContent value="out">
-            <div className="grid grid-cols-3 gap-2 py-4">
-              {presetOutButtons}
+        <div
+          ref={floatingRef}
+          className="bg-sidebar absolute right-2 top-2 z-[200] w-56 border p-0"
+        >
+          <div className="handle flex cursor-grab items-center justify-between px-4 py-3">
+            <p className="text-sm font-bold">Animations</p>
+            <div className="h-4 w-4" onClick={() => setFloatingControl("")}>
+              <X className="h-3 w-3 cursor-pointer font-extrabold text-muted-foreground" />
             </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </Draggable>
+          </div>
+
+          <Tabs defaultValue="in" className="w-full px-2">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="in">In</TabsTrigger>
+              <TabsTrigger value="out">Out</TabsTrigger>
+            </TabsList>
+            <TabsContent value="in">
+              <div className="grid grid-cols-3 gap-2 py-4">
+                {presetInButtons}
+              </div>
+            </TabsContent>
+            <TabsContent value="out">
+              <div className="grid grid-cols-3 gap-2 py-4">
+                {presetOutButtons}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </DndDraggable>
+    </DndProvider>
   );
 }

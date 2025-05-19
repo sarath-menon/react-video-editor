@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getIdFromClassName } from "../utils/scene";
 import { dispatch } from "@designcombo/events";
-import { EDIT_OBJECT } from "@designcombo/state";
+import { EDIT_OBJECT, LAYER_DELETE } from "@designcombo/state";
 import { getTargetById } from "../utils/target";
 import useStore from "../store/use-store";
 import StateManager from "@designcombo/state";
@@ -324,6 +324,22 @@ export function SceneInteractions({
       document.removeEventListener("pointercancel", handlePointerUp);
     };
   }, [targets, zoom]);
+
+  // Handle keyboard shortcuts for selected elements
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === "Delete" || e.key === "Backspace") && targets.length > 0) {
+        e.preventDefault();
+        dispatch(LAYER_DELETE);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [targets]);
 
   return (
     <>
